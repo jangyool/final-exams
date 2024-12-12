@@ -1,0 +1,112 @@
+const express = require("express");
+const cors = require("cors");
+const app = express();
+const PORT = 5000;
+
+app.use(cors());
+app.use(express.json());
+
+const items = [
+  { id: 1, name: "A", dimension: "90mm" },
+  { id: 2, name: "B", dimension: "100mm" },
+  { id: 3, name: "C", dimension: "110mm" },
+  { id: 4, name: "D", dimension: "220mm" },
+  { id: 5, name: "E", dimension: "315mm" },
+];
+let idCounter = 6;
+
+app.get("/items", (req, res) => {
+  res.json(items);
+});
+
+
+//    POST /items - 새로운 품번 추가
+//    품번명과 치수 정보 저장
+//    자동 증가 ID 부여
+
+app.post("/items", (req, res) => {
+  const { name, dimension } = req.body;
+  const newItem = { id: idCounter++, name, dimension };
+  items.push(newItem);
+  res.status(201).json({ message: "품번이 추가되었습니다.", item: newItem });
+});
+
+
+//  PUT /items/:id - 기존 품번 수정
+//  ID로 품번 찾아서 정보 수정
+//  치수 입력 시 mm 단위 자동 추가하도록 설정
+ 
+app.put("/items/:id", (req, res) => {
+  const { id } = req.params;
+  const { name, dimension } = req.body;
+  const item = items.find((i) => i.id == id);
+  if (!item) return res.status(404).json({ error: "품번을 찾을 수 없습니다." });
+
+  // dimension에 mm가 없으면 추가
+  const formattedDimension = dimension.includes("mm")
+    ? dimension
+    : `${dimension}mm`;
+
+  item.name = name || item.name;
+  item.dimension = formattedDimension || item.dimension;
+  res.json({ message: "품번이 수정되었습니다.", item });
+});
+
+
+//   DELETE /items/:id - 품번 삭제
+//   ID로 품번 찾아서 삭제
+//   삭제 후 성공 메시지 출력
+
+app.delete("/items/:id", (req, res) => {
+  const { id } = req.params;
+  const index = items.findIndex((i) => i.id == id);
+
+  if (index === -1) {
+    return res.status(404).json({ error: "품번을 찾을 수 없습니다." });
+  }
+
+  items.splice(index, 1);
+  res.json({ message: "품번이 삭제되었습니다." });
+});
+
+
+//  GET /items/:name - 특정 품번 조회
+//  품번명으로 정보 조회 (대소문자 구분 없앰)
+//  해당 품번의 상세 정보 반환함
+
+app.get("/items/:name", (req, res) => {
+  const { name } = req.params;
+  const item = items.find((i) => i.name.toUpperCase() === name.toUpperCase());
+  if (!item) return res.status(404).json({ error: "품번을 찾을 수 없습니다." });
+  res.json(item);
+});
+
+//  - 공차설정 -
+//   POST /items/verify - 치수 검증
+//  입력된 치수와 기준 치수 비교
+//   2mm 이내 오차: 정상 / 2mm 초과 오차: 불량
+  
+ 
+app.post("/items/verify", (req, res) => {
+  const { name, inputDimension } = req.body;
+  const item = items.find((i) => i.name.toUpperCase() === name.toUpperCase());
+
+  if (!item) {
+    return res.status(404).json({ error: "품번을 찾을 수 없습니다." });
+  }
+
+  // mm 단위 제거 후 숫자만 추출
+  const standardDimension = parseInt(item.dimension.replace("mm", ""));
+  const inputDim = parseInt(inputDimension.replace("mm", ""));
+  const difference = Math.abs(standardDimension - inputDim);
+
+  if (difference <= 2) {
+    return res.json({ message: "정상 치수입니다.", isValid: true });
+  } else {
+    return res.json({ message: "치수불량입니다.", isValid: false });
+  }
+});
+
+app.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
+});
